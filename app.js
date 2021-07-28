@@ -1,7 +1,8 @@
 const express = require('express');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
-const config = require("./config");
+const config = require('./config');
+const cookieParser = require('cookie-parser')
 
 const app = express();
 
@@ -25,7 +26,8 @@ app.set('view engine', 'ejs');
 // middlewares
 app.use(morgan('dev'));
 app.use(express.urlencoded({extended:false}));
-
+app.use(express.static('public'));
+app.use(cookieParser())
 
 // routes
 app.use('/', indexRoutes);

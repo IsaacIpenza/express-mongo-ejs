@@ -4,10 +4,10 @@ const Task = require('../model/task');
 const User = require('../model/user')
 const Image = require('../model/image');
 const verify = require('../middleware/verifyAccess');
-
 var multer = require('multer');
 var fs = require('fs');
 var path = require('path');
+var jwt = require('jsonwebtoken');
 
 var storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -60,6 +60,38 @@ app.get('/login', function(req,res){
   res.render('login');
 })
 
+app.post('/login', async function(req,res){
+
+  // var email = req.body.email;
+  // var password = req.body.password;
+
+  var{email, password} = req.body;
+
+  
+  var user = await User.findOne({email:email});
+
+  if(!user){
+   
+    return res.status(404).send("El usuario no existe")
+  
+  } else{
+    
+    var valid = await user.validatePassword(password);
+
+    if (valid) {
+
+      var token = jwt.sign({id: user.email, pemission:true}, "abcd1234", {expiresIn: "1h"});
+      console.log(token);
+
+      res.cookie("token", token, {httpOnly: true});
+      res.redirect("/");
+    } else{
+      console.log("Password is not valid");
+      res.redirect("/");
+    }
+  }
+});
+
 app.get('/register', function(req,res){
   res.render('register');
 })
@@ -77,13 +109,16 @@ app.post('/addUser', async function(req,res){
 // Nos regresaria las tareas guardadas en la BD con el método find(). Una vez obtenidas las tareas las regresamos a la pagina principal.
 app.get('/', verify, async function(req,res){
 
-  var tasks = await Task.find();
+  console.log("El usuario es: " + req.userId);
+  console.log("Permisos? : " + req.permission)
+
+  var tasks = await Task.find({user_id: req.userId});
 
   res.render('index', {tasks});
 });
 
 // Ruta que nos permita agregar nuevas tareas que vienen desde un metodo post. Una vez enviada la tarea podemos redireccionar a la pagina principal con res.redirect('/')
-app.post('/add', async (req,res) =>{
+app.post('/add', verify, async (req,res) =>{
 
   // var titulo = req.body.title;
   // var desc = req.body.description;
@@ -94,6 +129,8 @@ app.post('/add', async (req,res) =>{
   // })
 
   var task = new Task(req.body);
+
+  task.user_id = req.userId;
 
   await task.save();
   res.redirect("/");
@@ -139,6 +176,13 @@ app.get('/delete/:id',  async (req,res) =>{
   var id = req.params.id;
 
   await Task.remove({_id: id});
+  res.redirect("/");
+});
+
+
+app.get('/logoff',  async (req,res) =>{
+
+  res.clearCookie("token")
   res.redirect("/");
 });
 
